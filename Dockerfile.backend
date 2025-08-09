@@ -1,0 +1,51 @@
+# =========================================================================
+# ESTÁGIO 1: Build (Ambiente de Desenvolvimento/Compilação)
+# Usamos uma imagem leve (alpine) para compilar o código.
+# =========================================================================
+FROM node:20-alpine AS build
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia os arquivos de definição de pacotes
+COPY package.json ./
+COPY package-lock.json ./
+
+# Instala TODAS as dependências, incluindo as 'devDependencies' (como o TypeScript)
+# para que possamos compilar o projeto.
+RUN npm install
+
+# Copia todo o restante do código-fonte para o contêiner
+COPY . .
+
+# Compila o TypeScript para JavaScript
+# O tsconfig.server.json garante que apenas o backend seja compilado
+RUN npm run build:server
+
+
+# =========================================================================
+# ESTÁGIO 2: Produção (Ambiente de Execução)
+# Usamos uma imagem mais robusta (slim) e limpa para rodar a aplicação.
+# =========================================================================
+FROM node:20-slim
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia apenas o package.json para instalar somente as dependências de produção
+COPY package.json ./
+
+# Neste estágio final, instalamos apenas as dependências de PRODUÇÃO.
+# Isso torna a imagem final muito menor e mais segura.
+RUN npm install --omit=dev
+
+# Copia o código já compilado (em JavaScript) do estágio de 'build'.
+# O nome da pasta "dist-server" foi retirado do seu tsconfig.server.json.
+COPY --from=build /app/dist-server ./dist-server
+
+# Expõe a porta que a sua aplicação usa (ajuste se for diferente)
+EXPOSE 3000
+
+# Comando para iniciar o servidor em produção.
+# O entrypoint é o arquivo principal ("server.ts") compilado dentro da pasta "dist-server".
+CMD [ "node", "dist-server/server.js" ]

@@ -1,0 +1,48 @@
+# Local: docker-compose.yml
+
+version: '3.8'
+
+services:
+  recia-backend:
+    image: orickjogando/recia-backend:1.0.0
+    env_file:
+      - ./.env.production
+    # --- NOVA ABORDAGEM APLICADA AQUI ---
+    # Esta linha força o contêiner a rodar em modo de produção.
+    environment:
+      - NODE_ENV=production
+    # --- FIM DA MUDANÇA ---
+    networks:
+      - traefik_network
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=Foco"
+        - "traefik.http.routers.recia-backend-router.rule=Host(`backend.recrutamentoia.com.br`)"
+        - "traefik.http.routers.recia-backend-router.entrypoints=websecure"
+        - "traefik.http.routers.recia-backend-router.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.recia-backend-service.loadbalancer.server.port=3001"
+
+  recia-frontend:
+    image: orickjogando/recia-frontend:1.0.0
+    networks:
+      - traefik_network
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=Foco"
+        - "traefik.http.routers.recia-frontend-router.rule=Host(`recrutamentoia.com.br`) || Host(`www.recrutamentoia.com.br`)"
+        - "traefik.http.routers.recia-frontend-router.entrypoints=websecure"
+        - "traefik.http.routers.recia-frontend-router.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.recia-frontend-service.loadbalancer.server.port=80"
+
+networks:
+  traefik_network:
+    external: true
+    name: Foco
